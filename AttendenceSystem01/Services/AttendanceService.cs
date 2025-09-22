@@ -19,13 +19,14 @@ namespace AttendenceSystem01.Services
         {
             try
             {
-                var now = DateTime.UtcNow;
+                var istZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+                var istNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, istZone);
 
                 var attendance = new Attendance
                 {
                     UserId = dto.UserId,
-                    CheckInTime = DateTime.Now.TimeOfDay,
-                    AttendanceDate = DateOnly.FromDateTime(now),
+                    CheckInTime = istNow.TimeOfDay,
+                    AttendanceDate = DateOnly.FromDateTime(istNow.Date),
                     Status = "Pending"
                 };
 
@@ -42,7 +43,10 @@ namespace AttendenceSystem01.Services
         {
             try
             {
-                var today = DateOnly.FromDateTime(DateTime.Now);
+                var istZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+                var istNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, istZone);
+
+                var today = DateOnly.FromDateTime(istNow.Date);
                 var records = await _repository.GetByUserAndDateAsync(dto.UserId, today);
 
                 if (!records.Any())
@@ -53,15 +57,18 @@ namespace AttendenceSystem01.Services
                 if (lastRecord == null)
                     return "All check-ins already checked out.";
 
-                lastRecord.CheckOutTime = DateTime.Now.TimeOfDay;
+                lastRecord.CheckOutTime = istNow.TimeOfDay;
                 await _repository.UpdateAsync(lastRecord);
 
-                // Calculate working hours
                 var firstCheckIn = records.Min(a => a.CheckInTime);
                 var lastCheckOutTime = records.Max(a => a.CheckOutTime);
-                var duration = lastCheckOutTime.Value - firstCheckIn.Value;
 
-                string workingHours = duration.ToString(@"hh\:mm\:ss");
+                string workingHours = "00:00:00";
+                if (firstCheckIn != null && lastCheckOutTime != null)
+                {
+                    var duration = lastCheckOutTime.Value - firstCheckIn.Value;
+                    workingHours = duration.ToString(@"hh\:mm\:ss");
+                }
 
                 foreach (var rec in records)
                 {
@@ -77,6 +84,7 @@ namespace AttendenceSystem01.Services
                 return $"Error during check-out: {ex.Message}";
             }
         }
+
 
         public async Task<object> GetTodayAttendanceAsync(int userId)
         {
