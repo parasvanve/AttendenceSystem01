@@ -1,11 +1,14 @@
 ﻿using AttendenceSystem01.Dtos;
 using AttendenceSystem01.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace AttendenceSystem01.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class AttendanceController : ControllerBase
     {
         private readonly IAttendanceService _service;
@@ -16,51 +19,76 @@ namespace AttendenceSystem01.Controllers
         }
 
         [HttpPost("checkin")]
-        public async Task<IActionResult> CheckIn([FromBody] AttendanceDto dto)
+        public async Task<IActionResult> CheckIn()
         {
-            var result = await _service.CheckInAsync(dto);
+            try
+            {
+                var userIdFromToken = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+                if (userIdFromToken == 0)
+                    return Unauthorized(new { message = "Invalid token or user not found." });
 
-            if (result.StartsWith("Error"))
-                return StatusCode(500, new { message = result });
+                var result = await _service.CheckInAsync(userIdFromToken);
 
-            return Ok(new { message = result });
+                if (result.StartsWith("Error"))
+                    return StatusCode(500, new { message = result });
+
+                return Ok(new { message = result });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = $"Unexpected error: {ex.Message}" });
+            }
         }
 
         [HttpPost("checkout")]
-        public async Task<IActionResult> CheckOut([FromBody] AttendanceDto dto)
+        public async Task<IActionResult> CheckOut()
         {
-            var result = await _service.CheckOutAsync(dto);
+            try
+            {
+                var userIdFromToken = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+                if (userIdFromToken == 0)
+                    return Unauthorized(new { message = "Invalid token or user not found." });
 
-            if (result.Contains("not checked in") || result.Contains("already checked out"))
-                return BadRequest(new { message = result });
+                var result = await _service.CheckOutAsync(userIdFromToken);
 
-            if (result.StartsWith("Error"))
-                return StatusCode(500, new { message = result });
+                if (result.Contains("not checked in") || result.Contains("already checked out"))
+                    return BadRequest(new { message = result });
 
-            return Ok(new { message = result });
+                if (result.StartsWith("Error"))
+                    return StatusCode(500, new { message = result });
+
+                return Ok(new { message = result });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = $"Unexpected error: {ex.Message}" });
+            }
         }
 
-        [HttpGet("TodayAttendenceByUserId/{userId}")]
-        public async Task<IActionResult> GetTodayAttendance(int userId)
+        [HttpGet("TodayAttendenceByUser")]
+        public async Task<IActionResult> GetTodayAttendance()
         {
-            var records = await _service.GetTodayAttendanceAsync(userId);
+            var userIdFromToken = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+            var records = await _service.GetTodayAttendanceAsync(userIdFromToken);
             return Ok(records);
         }
 
-        [HttpGet("GetAllAttendenceByUserId/{userId}")]
-        public async Task<IActionResult> GetAllAttendance(int userId)
+        // ✅ All Attendance (current user only)
+        [HttpGet("GetAllAttendenceByUser")]
+        public async Task<IActionResult> GetAllAttendance()
         {
-            var records = await _service.GetAllAttendanceAsync(userId);
+            var userIdFromToken = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+            var records = await _service.GetAllAttendanceAsync(userIdFromToken);
             return Ok(records);
         }
 
+        // ✅ All Users Attendance (Admin only)
         [HttpGet("GetAllUsersAttendance")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAllUsersAttendance()
         {
             var result = await _service.GetAllUsersAttendanceAsync();
             return Ok(result);
         }
-
-
     }
 }

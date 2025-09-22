@@ -86,6 +86,41 @@
                 }
             }
 
+            public async Task UpdateAsync(User user)
+            {
+                _context.Users.Update(user);
+                await _context.SaveChangesAsync();
+            }
+
+
+            public async Task UpdateUserRolesAsync(int userId, List<int> roleIds)
+            {
+                var existingRoles = _context.UserRoles.Where(ur => ur.UserId == userId);
+                _context.UserRoles.RemoveRange(existingRoles);
+
+                foreach (var roleId in roleIds)
+                {
+                    _context.UserRoles.Add(new UserRole { UserId = userId, RoleId = roleId });
+                }
+
+                await _context.SaveChangesAsync();
+            }
+
+            public async Task DeleteAsync(User user)
+            {
+                _context.Users.Remove(user);
+                await _context.SaveChangesAsync();
+            }
+
+            public async Task<User?> GetByIdAsync(int userId)
+            {
+                return await _context.Users
+                    .Include(u => u.UserRoles)   
+                    .ThenInclude(ur => ur.Role)
+                    .FirstOrDefaultAsync(u => u.UserId == userId);
+            }
+
+
         }
     }
 

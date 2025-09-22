@@ -1,8 +1,5 @@
-﻿using AttendenceSystem01.Dtos;
-using AttendenceSystem01.Interfaces;
+﻿using AttendenceSystem01.Interfaces;
 using AttendenceSystem01.Models;
-using AttendenceSystem01.Interfaces;
-using AttendenceSystem01.Interfaces;
 
 namespace AttendenceSystem01.Services
 {
@@ -15,18 +12,26 @@ namespace AttendenceSystem01.Services
             _repository = repository;
         }
 
-        public async Task<string> CheckInAsync(AttendanceDto dto)
+        // ✅ CHECKIN
+        public async Task<string> CheckInAsync(int userId)
         {
             try
             {
                 var istZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
                 var istNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, istZone);
 
+                var today = DateOnly.FromDateTime(istNow.Date);
+
+                // agar pehle hi check-in hai to multiple check-in prevent kare
+                var todayRecords = await _repository.GetByUserAndDateAsync(userId, today);
+                if (todayRecords.Any(a => a.CheckOutTime == null))
+                    return "You are already checked in. Please checkout first.";
+
                 var attendance = new Attendance
                 {
-                    UserId = dto.UserId,
+                    UserId = userId,
                     CheckInTime = istNow.TimeOfDay,
-                    AttendanceDate = DateOnly.FromDateTime(istNow.Date),
+                    AttendanceDate = today,
                     Status = "Pending"
                 };
 
@@ -39,7 +44,8 @@ namespace AttendenceSystem01.Services
             }
         }
 
-        public async Task<string> CheckOutAsync(AttendanceDto dto)
+        // ✅ CHECKOUT
+        public async Task<string> CheckOutAsync(int userId)
         {
             try
             {
@@ -47,34 +53,35 @@ namespace AttendenceSystem01.Services
                 var istNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, istZone);
 
                 var today = DateOnly.FromDateTime(istNow.Date);
-                var records = await _repository.GetByUserAndDateAsync(dto.UserId, today);
+                var records = await _repository.GetByUserAndDateAsync(userId, today);
 
                 if (!records.Any())
-                    return "User has not checked in today.";
+                    return "You have not checked in today.";
 
                 var lastRecord = records.LastOrDefault(a => a.CheckOutTime == null);
-
                 if (lastRecord == null)
-                    return "All check-ins already checked out.";
+                    return "You have already checked out today.";
 
+                // checkout mark karo
                 lastRecord.CheckOutTime = istNow.TimeOfDay;
+                lastRecord.Status = "Present";
                 await _repository.UpdateAsync(lastRecord);
 
+                // working hours calculate karo (first checkin -> last checkout)
                 var firstCheckIn = records.Min(a => a.CheckInTime);
                 var lastCheckOutTime = records.Max(a => a.CheckOutTime);
 
-                string workingHours = "00:00:00";
                 if (firstCheckIn != null && lastCheckOutTime != null)
                 {
                     var duration = lastCheckOutTime.Value - firstCheckIn.Value;
-                    workingHours = duration.ToString(@"hh\:mm\:ss");
-                }
+                    string workingHours = duration.ToString(@"hh\:mm\:ss");
 
-                foreach (var rec in records)
-                {
-                    rec.WorkingHours = workingHours;
-                    rec.Status = "Present";
-                    await _repository.UpdateAsync(rec);
+                    foreach (var rec in records)
+                    {
+                        rec.WorkingHours = workingHours;
+                        rec.Status = "Present";
+                        await _repository.UpdateAsync(rec);
+                    }
                 }
 
                 return "Check-out successful";
@@ -85,7 +92,6 @@ namespace AttendenceSystem01.Services
             }
         }
 
-
         public async Task<object> GetTodayAttendanceAsync(int userId)
         {
             try
@@ -93,12 +99,9 @@ namespace AttendenceSystem01.Services
                 var today = DateOnly.FromDateTime(DateTime.UtcNow);
                 var records = await _repository.GetByUserAndDateAsync(userId, today);
 
-                if (records == null || !records.Any())
-                {
+                if (!records.Any())
                     return new { workingHours = "00:00:00", attendances = new List<object>() };
-                }
 
-                // calculate working hours (first check-in → last checkout)
                 var firstCheckIn = records.Min(a => a.CheckInTime);
                 var lastCheckOut = records.Max(a => a.CheckOutTime);
 
@@ -109,8 +112,7 @@ namespace AttendenceSystem01.Services
                     workingHours = duration.ToString(@"hh\:mm\:ss");
                 }
 
-                // return shaped response
-                var response = new
+                return new
                 {
                     workingHours,
                     attendances = records.Select(a => new
@@ -121,29 +123,24 @@ namespace AttendenceSystem01.Services
                         CheckInTime = a.CheckInTime?.ToString(@"hh\:mm\:ss"),
                         CheckOutTime = a.CheckOutTime?.ToString(@"hh\:mm\:ss"),
                         a.Status
-                    })
+                    }).ToList()
                 };
-                return response;
             }
-            catch (Exception)
+            catch
             {
                 return new { workingHours = "00:00:00", attendances = new List<object>() };
             }
         }
 
-        // AttendanceService.cs
+        // ✅ All Attendance (single user)
         public async Task<object> GetAllAttendanceAsync(int userId)
         {
             try
             {
                 var records = await _repository.GetByUserAsync(userId);
-
-                if (records == null || !records.Any())
-                {
+                if (!records.Any())
                     return new { totalWorkingHours = "00:00:00", attendances = new List<object>() };
-                }
 
-                // total working hours across all days
                 TimeSpan totalDuration = TimeSpan.Zero;
                 foreach (var day in records.GroupBy(r => r.AttendanceDate))
                 {
@@ -154,11 +151,9 @@ namespace AttendenceSystem01.Services
                         totalDuration += lastCheckOut.Value - firstCheckIn.Value;
                 }
 
-                string totalWorkingHours = totalDuration.ToString(@"hh\:mm\:ss");
-
-                var response = new
+                return new
                 {
-                    totalWorkingHours,
+                    totalWorkingHours = totalDuration.ToString(@"hh\:mm\:ss"),
                     attendances = records.Select(a => new
                     {
                         a.AttendanceId,
@@ -169,35 +164,27 @@ namespace AttendenceSystem01.Services
                         a.Status
                     }).ToList()
                 };
-
-                return response;
             }
-            catch (Exception)
+            catch
             {
                 return new { totalWorkingHours = "00:00:00", attendances = new List<object>() };
             }
         }
 
-        // AttendanceService.cs
+        // ✅ All Users Attendance (Admin Only)
         public async Task<object> GetAllUsersAttendanceAsync()
         {
             try
             {
                 var records = await _repository.GetAllAsync();
-
-                if (records == null || !records.Any())
-                {
+                if (!records.Any())
                     return new List<object>();
-                }
 
-                // Group by UserId
-                var grouped = records
+                return records
                     .GroupBy(r => r.UserId)
                     .Select(g =>
                     {
-                        // Total working hours calculation
                         TimeSpan totalDuration = TimeSpan.Zero;
-
                         foreach (var day in g.GroupBy(r => r.AttendanceDate))
                         {
                             var firstCheckIn = day.Min(a => a.CheckInTime);
@@ -221,15 +208,11 @@ namespace AttendenceSystem01.Services
                             }).ToList()
                         };
                     }).ToList();
-
-                return grouped;
             }
-            catch (Exception)
+            catch
             {
                 return new List<object>();
             }
         }
-
-
     }
 }

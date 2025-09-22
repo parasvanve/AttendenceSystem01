@@ -1,7 +1,10 @@
 ﻿using AttendenceSystem01.Dtos;
-using AttendenceSystem01.IServices;
 using AttendenceSystem01.Interfaces;
+using AttendenceSystem01.IServices;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
+using System.Security.Claims;
 
 namespace AttendenceSystem01.Controllers
 {
@@ -44,20 +47,24 @@ namespace AttendenceSystem01.Controllers
             {
                 var result = await _service.LoginAsync(dto);
 
-                if (result == "Invalid credentials")
-                    return Unauthorized(new { message = result });
+                if (result.Token == null)
+                    return Unauthorized(new { message = "Invalid credentials" });
 
-                if (result.StartsWith("Error"))
-                    return StatusCode(500, new { message = result });
-
-                return Ok(new { message = result });
+                return Ok(new
+                {
+                    message = "Login successful",
+                    token = result.Token
+                });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = $"Unexpected error: {ex.Message}" });
             }
         }
+
+
         [HttpGet("GetAllUsers")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAllUsers()
         {
             var result = await _service.GetAllUsersAsync();
@@ -65,10 +72,38 @@ namespace AttendenceSystem01.Controllers
         }
 
         [HttpGet("GetAllRoles")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAllRoles()
         {
             var result = await _service.GetAllRolesAsync();
             return Ok(result);
         }
+
+        [HttpPut("update")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateUser([FromBody] UserUpdateDto dto)
+        {
+            var userIdFromToken = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+            var isAdmin = User.IsInRole("Admin");
+
+            if (!isAdmin && userIdFromToken != dto.UserId)
+                return Unauthorized(new { message = "You are not authorized to update this user." });
+
+            var result = await _service.UpdateUserAsync(dto, isAdmin);
+            return Ok(new { message = result });
+        }
+
+        [HttpDelete("delete/{userId}")]
+        [Authorize(Roles = "Admin")] 
+        public async Task<IActionResult> DeleteUser(int userId)
+        {
+            var result = await _service.DeleteUserAsync(userId);
+            if (result.StartsWith("Error"))
+                return StatusCode(500, new { message = result });
+
+            return Ok(new { message = result });
+        }
+
+
     }
 }
