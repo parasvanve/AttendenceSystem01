@@ -62,29 +62,39 @@ namespace AttendenceSystem01.Services
             }
         }
 
-        public async Task<(string Message, string? Token)> LoginAsync(LoginDto dto)
+        public async Task<(string Message, string? Token, int UserId, List<object> Roles)> LoginAsync(LoginDto dto)
         {
             try
             {
                 var user = await _repository.GetByEmailAsync(dto.Email);
                 if (user == null)
-                    return ("Invalid credentials", null);
+                    return ("Invalid credentials", null, 0, new List<object>());
 
                 var decrypted = _encryption.Decrypt(user.PasswordHash);
                 if (decrypted != dto.Password)
-                    return ("Invalid credentials",null );
+                    return ("Invalid credentials", null, 0, new List<object>());
 
-                // Token generate
-                var roles = user.UserRoles.Select(r => r.Role.RoleName).ToList();
-                var token = _jwtService.GenerateToken(user.UserId, user.Email, roles);
+                var roles = user.UserRoles
+                .Select(ur => new
+                {
+                 RoleId = ur.Role.RoleId,
+                 RoleName = ur.Role.RoleName
+                })
+                .ToList();
 
-                return ("Login successful", token);
+                var roleNames = roles.Select(r => r.RoleName).ToList();
+
+                var token = _jwtService.GenerateToken(user.UserId, user.Email, roleNames);
+
+                return ("Login successful", token, user.UserId, roles.Cast<object>().ToList());
+
             }
             catch (Exception ex)
             {
-                return ($"Error during login: {ex.Message}",null);
+                return ($"Error during login: {ex.Message}", null, 0, new List<object>());
             }
         }
+
 
 
 

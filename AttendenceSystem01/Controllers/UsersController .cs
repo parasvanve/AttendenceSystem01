@@ -52,8 +52,10 @@ namespace AttendenceSystem01.Controllers
 
                 return Ok(new
                 {
-                    message = "Login successful",
-                    token = result.Token
+                    message = result.Message,
+                    token = result.Token,
+                    userId = result.UserId,
+                    roles = result.Roles 
                 });
             }
             catch (Exception ex)
@@ -61,6 +63,7 @@ namespace AttendenceSystem01.Controllers
                 return StatusCode(500, new { message = $"Unexpected error: {ex.Message}" });
             }
         }
+
 
 
         [HttpGet("GetAllUsers")]
