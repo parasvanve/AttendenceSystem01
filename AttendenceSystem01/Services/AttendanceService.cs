@@ -12,7 +12,6 @@ namespace AttendenceSystem01.Services
             _repository = repository;
         }
 
-        // ✅ CHECKIN
         public async Task<string> CheckInAsync(int userId)
         {
             try
@@ -22,7 +21,6 @@ namespace AttendenceSystem01.Services
 
                 var today = DateOnly.FromDateTime(istNow.Date);
 
-                // agar pehle hi check-in hai to multiple check-in prevent kare
                 var todayRecords = await _repository.GetByUserAndDateAsync(userId, today);
                 if (todayRecords.Any(a => a.CheckOutTime == null))
                     return "You are already checked in. Please checkout first.";
@@ -44,7 +42,6 @@ namespace AttendenceSystem01.Services
             }
         }
 
-        // ✅ CHECKOUT
         public async Task<string> CheckOutAsync(int userId)
         {
             try
@@ -62,12 +59,10 @@ namespace AttendenceSystem01.Services
                 if (lastRecord == null)
                     return "You have already checked out today.";
 
-                // checkout mark karo
                 lastRecord.CheckOutTime = istNow.TimeOfDay;
                 lastRecord.Status = "Present";
                 await _repository.UpdateAsync(lastRecord);
 
-                // working hours calculate karo (first checkin -> last checkout)
                 var firstCheckIn = records.Min(a => a.CheckInTime);
                 var lastCheckOutTime = records.Max(a => a.CheckOutTime);
 
