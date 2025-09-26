@@ -66,6 +66,7 @@ namespace AttendenceSystem01.Controllers
         }
 
         [HttpGet("TodayAttendenceByUser")]
+      
         public async Task<IActionResult> GetTodayAttendance()
         {
             var userIdFromToken = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
@@ -73,8 +74,8 @@ namespace AttendenceSystem01.Controllers
             return Ok(records);
         }
 
-        // ✅ All Attendance (current user only)
         [HttpGet("GetAllAttendenceByUser")]
+        [Authorize(Roles = "Admin,Super Admin")]
         public async Task<IActionResult> GetAllAttendance()
         {
             var userIdFromToken = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
@@ -82,9 +83,8 @@ namespace AttendenceSystem01.Controllers
             return Ok(records);
         }
 
-        // ✅ All Users Attendance (Admin only)
         [HttpGet("GetAllUsersAttendance")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Super Admin")]
         public async Task<IActionResult> GetAllUsersAttendance()
         {
             var result = await _service.GetAllUsersAttendanceAsync();

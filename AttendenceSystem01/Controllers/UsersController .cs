@@ -67,7 +67,7 @@ namespace AttendenceSystem01.Controllers
 
 
         [HttpGet("GetAllUsers")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Super Admin")]
         public async Task<IActionResult> GetAllUsers()
         {
             var result = await _service.GetAllUsersAsync();
@@ -75,7 +75,7 @@ namespace AttendenceSystem01.Controllers
         }
 
         [HttpGet("GetAllRoles")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Super Admin")]
         public async Task<IActionResult> GetAllRoles()
         {
             var result = await _service.GetAllRolesAsync();
@@ -83,7 +83,7 @@ namespace AttendenceSystem01.Controllers
         }
 
         [HttpPut("update")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Super Admin")]
         public async Task<IActionResult> UpdateUser([FromBody] UserUpdateDto dto)
         {
             var userIdFromToken = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
@@ -97,7 +97,7 @@ namespace AttendenceSystem01.Controllers
         }
 
         [HttpDelete("delete/{userId}")]
-        [Authorize(Roles = "Admin")] 
+        [Authorize(Roles = "Admin,Super Admin")]
         public async Task<IActionResult> DeleteUser(int userId)
         {
             var result = await _service.DeleteUserAsync(userId);
@@ -108,7 +108,7 @@ namespace AttendenceSystem01.Controllers
         }
 
         [HttpGet("GetUserById/{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Super Admin")]
         public async Task<IActionResult> GetUserById(int id)
         {
             var result = await _service.GetUserByIdAsync(id);
