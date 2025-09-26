@@ -3,8 +3,11 @@ using AttendenceSystem01.Interfaces;
 using AttendenceSystem01.Iservices;
 using AttendenceSystem01.IServices;
 using AttendenceSystem01.Models;
-using NPOI.POIFS.Crypt;
-
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace AttendenceSystem01.Services
 {
@@ -13,21 +16,28 @@ namespace AttendenceSystem01.Services
         private readonly IUserRepository _repository;
         private readonly IEncryptionService _encryption;
         private readonly IJwtService _jwtService;
+        private readonly ILogger<UserService> _logger;
 
-        public UserService(IUserRepository repository, IEncryptionService encryption, IJwtService jwtService)
+        public UserService(IUserRepository repository, IEncryptionService encryption, IJwtService jwtService, ILogger<UserService> logger)
         {
             _repository = repository;
             _encryption = encryption;
             _jwtService = jwtService;
+            _logger = logger;
         }
 
         public async Task<string> RegisterAsync(RegisterUserDto dto)
         {
             try
             {
+                _logger.LogInformation("RegisterAsync called for email {Email}", dto.Email);
+
                 var existing = await _repository.GetByEmailAsync(dto.Email);
                 if (existing != null)
+                {
+                    _logger.LogWarning("Email {Email} already exists", dto.Email);
                     return "Email already exists!";
+                }
 
                 var user = new User
                 {
@@ -39,7 +49,7 @@ namespace AttendenceSystem01.Services
                     CreatedById = dto.CreatedById
                 };
 
-                await _repository.AddUserAsync(user); 
+                await _repository.AddUserAsync(user);
 
                 if (dto.RoleIds != null && dto.RoleIds.Count > 0)
                 {
@@ -50,14 +60,16 @@ namespace AttendenceSystem01.Services
                             UserId = user.UserId,
                             RoleId = roleId
                         };
-                        await _repository.AddUserRoleAsync(userRole); 
+                        await _repository.AddUserRoleAsync(userRole);
                     }
                 }
 
+                _logger.LogInformation("User registered successfully with email {Email}", dto.Email);
                 return "User registered";
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error during registration for email {Email}", dto.Email);
                 return $"Error during registration: {ex.Message}";
             }
         }
@@ -66,46 +78,56 @@ namespace AttendenceSystem01.Services
         {
             try
             {
+                _logger.LogInformation("LoginAsync called for email {Email}", dto.Email);
+
                 var user = await _repository.GetByEmailAsync(dto.Email);
                 if (user == null)
+                {
+                    _logger.LogWarning("Invalid login attempt for email {Email}", dto.Email);
                     return ("Invalid credentials", null, 0, new List<object>());
+                }
 
                 var decrypted = _encryption.Decrypt(user.PasswordHash);
                 if (decrypted != dto.Password)
+                {
+                    _logger.LogWarning("Invalid login attempt for email {Email}", dto.Email);
                     return ("Invalid credentials", null, 0, new List<object>());
+                }
 
                 var roles = user.UserRoles
-                .Select(ur => new
-                {
-                 RoleId = ur.Role.RoleId,
-                 RoleName = ur.Role.RoleName
-                })
-                .ToList();
+                    .Select(ur => new
+                    {
+                        RoleId = ur.Role.RoleId,
+                        RoleName = ur.Role.RoleName
+                    })
+                    .ToList();
 
                 var roleNames = roles.Select(r => r.RoleName).ToList();
-
                 var token = _jwtService.GenerateToken(user.UserId, user.Email, roleNames);
 
+                _logger.LogInformation("User logged in successfully with email {Email}", dto.Email);
                 return ("Login successful", token, user.UserId, roles.Cast<object>().ToList());
-
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error during login for email {Email}", dto.Email);
                 return ($"Error during login: {ex.Message}", null, 0, new List<object>());
             }
         }
-
-
-
 
         public async Task<object> GetAllUsersAsync()
         {
             try
             {
+                _logger.LogInformation("GetAllUsersAsync called");
+
                 var users = await _repository.GetAllAsync();
 
                 if (users == null || !users.Any())
+                {
+                    _logger.LogWarning("No users found");
                     return new { message = "No users found", data = new List<object>() };
+                }
 
                 var result = users.Select(u => new
                 {
@@ -115,27 +137,37 @@ namespace AttendenceSystem01.Services
                     Roles = u.UserRoles.Select(r => r.Role.RoleName).ToList()
                 }).ToList();
 
+                _logger.LogInformation("{Count} users fetched successfully", result.Count);
                 return new { message = "Users fetched successfully", data = result };
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error fetching users");
                 return new { message = $"Error: {ex.Message}", data = new List<object>() };
             }
         }
+
         public async Task<object> GetAllRolesAsync()
         {
             try
             {
+                _logger.LogInformation("GetAllRolesAsync called");
+
                 var roles = await _repository.GetAllrolesAsync();
 
                 if (roles == null || !roles.Any())
+                {
+                    _logger.LogWarning("No roles found");
                     return new { message = "No roles found", data = new List<object>() };
+                }
 
                 var result = roles.Select(r => new { r.RoleId, r.RoleName }).ToList();
+                _logger.LogInformation("{Count} roles fetched successfully", result.Count);
                 return new { message = "Roles fetched successfully", data = result };
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error fetching roles");
                 return new { message = $"Error: {ex.Message}", data = new List<object>() };
             }
         }
@@ -144,100 +176,109 @@ namespace AttendenceSystem01.Services
         {
             try
             {
+                _logger.LogInformation("UpdateUserAsync called for userId {UserId}", dto.UserId);
+
                 var user = await _repository.GetByIdAsync(dto.UserId);
                 if (user == null)
+                {
+                    _logger.LogWarning("User with Id {UserId} not found", dto.UserId);
                     return "User not found";
+                }
 
-                // Basic fields
                 user.FullName = dto.FullName ?? user.FullName;
                 user.Email = dto.Email ?? user.Email;
 
-                // Password encryption
                 if (!string.IsNullOrEmpty(dto.Password))
-                {
                     user.PasswordHash = _encryption.Encrypt(dto.Password);
-
-                }
 
                 if (dto.IsActive.HasValue)
                     user.IsActive = dto.IsActive.Value;
 
-                // Only admin can update roles
                 if (isAdmin && dto.RoleIds != null)
-                {
                     await _repository.UpdateUserRolesAsync(user.UserId, dto.RoleIds);
-                }
 
                 await _repository.UpdateAsync(user);
+                _logger.LogInformation("User with Id {UserId} updated successfully", dto.UserId);
                 return "User updated successfully";
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error updating user with Id {UserId}", dto.UserId);
                 return $"Error updating user: {ex.Message}";
             }
         }
-
 
         public async Task<string> DeleteUserAsync(int userId)
         {
             try
             {
+                _logger.LogInformation("DeleteUserAsync called for userId {UserId}", userId);
+
                 var user = await _repository.GetByIdAsync(userId);
                 if (user == null)
+                {
+                    _logger.LogWarning("User with Id {UserId} not found", userId);
                     return "User not found";
+                }
 
-                // First remove roles
                 await _repository.UpdateUserRolesAsync(userId, new List<int>());
-
-                // Then delete user
                 await _repository.DeleteAsync(user);
+
+                _logger.LogInformation("User with Id {UserId} deleted successfully", userId);
                 return "User deleted successfully";
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error deleting user with Id {UserId}", userId);
                 return $"Error deleting user: {ex.Message}";
             }
         }
+
         public async Task<object?> GetUserByIdAsync(int id)
         {
-            var user = await _repository.GetUserByIdAsync(id);
-            if (user == null)
-                return null;
-
-            var roles = user.UserRoles
-                .Select(ur => new
-                {
-                    RoleId = ur.Role.RoleId,
-                    RoleName = ur.Role.RoleName
-                })
-                .ToList();
-
-            return new
+            try
             {
-                user.UserId,
-                user.FullName,
-                user.Email,
-                user.IsActive,
-                Roles = roles,
+                _logger.LogInformation("GetUserByIdAsync called for userId {UserId}", id);
 
-                Attendances = user.Attendances?.Select(a => new
+                var user = await _repository.GetUserByIdAsync(id);
+                if (user == null)
                 {
-                    a.AttendanceDate,
-                    CheckInTime = a.CheckInTime.HasValue
-                   ? a.CheckInTime.Value.ToString(@"hh\:mm\:ss")
-                   : null,
-                    CheckOutTime = a.CheckOutTime.HasValue
-                   ? a.CheckOutTime.Value.ToString(@"hh\:mm\:ss")
-                   : null,
-                    a.Status,
-                    a.WorkingHours
-                })
+                    _logger.LogWarning("User with Id {UserId} not found", id);
+                    return null;
+                }
 
-            };
+                var roles = user.UserRoles
+                    .Select(ur => new
+                    {
+                        RoleId = ur.Role.RoleId,
+                        RoleName = ur.Role.RoleName
+                    })
+                    .ToList();
+
+                _logger.LogInformation("User with Id {UserId} retrieved successfully with {RoleCount} roles", id, roles.Count);
+
+                return new
+                {
+                    user.UserId,
+                    user.FullName,
+                    user.Email,
+                    user.IsActive,
+                    Roles = roles,
+                    Attendances = user.Attendances?.Select(a => new
+                    {
+                        a.AttendanceDate,
+                        CheckInTime = a.CheckInTime?.ToString(@"hh\:mm\:ss"),
+                        CheckOutTime = a.CheckOutTime?.ToString(@"hh\:mm\:ss"),
+                        a.Status,
+                        a.WorkingHours
+                    })
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching user with Id {UserId}", id);
+                throw;
+            }
         }
-
-
-
-
     }
 }

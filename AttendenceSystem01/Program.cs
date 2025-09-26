@@ -1,4 +1,3 @@
-using AttendenceSystem01.AttendenceSystem01.Repositories;
 using AttendenceSystem01.Interfaces;
 using AttendenceSystem01.Iservices;
 using AttendenceSystem01.IServices;
@@ -43,7 +42,7 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = jwtIssuer,
         ValidAudience = jwtIssuer,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-        ClockSkew = TimeSpan.FromSeconds(30) // small tolerance
+        ClockSkew = TimeSpan.FromSeconds(30) 
     };
 });
 

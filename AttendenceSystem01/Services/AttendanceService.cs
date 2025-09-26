@@ -1,29 +1,36 @@
 ﻿using AttendenceSystem01.Interfaces;
 using AttendenceSystem01.Models;
+using Microsoft.Extensions.Logging;
 
 namespace AttendenceSystem01.Services
 {
     public class AttendanceService : IAttendanceService
     {
         private readonly IAttendanceRepository _repository;
+        private readonly ILogger<AttendanceService> _logger;
 
-        public AttendanceService(IAttendanceRepository repository)
+        public AttendanceService(IAttendanceRepository repository, ILogger<AttendanceService> logger)
         {
             _repository = repository;
+            _logger = logger;
         }
 
         public async Task<string> CheckInAsync(int userId)
         {
             try
             {
+                _logger.LogInformation("CheckInAsync called for UserId: {UserId}", userId);
+
                 var istZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
                 var istNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, istZone);
-
                 var today = DateOnly.FromDateTime(istNow.Date);
 
                 var todayRecords = await _repository.GetByUserAndDateAsync(userId, today);
                 if (todayRecords.Any(a => a.CheckOutTime == null))
+                {
+                    _logger.LogWarning("User {UserId} already checked in today", userId);
                     return "You are already checked in. Please checkout first.";
+                }
 
                 var attendance = new Attendance
                 {
@@ -34,10 +41,12 @@ namespace AttendenceSystem01.Services
                 };
 
                 await _repository.AddAsync(attendance);
+                _logger.LogInformation("Check-in successful for UserId: {UserId}", userId);
                 return "Check-in successful";
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error during check-in for UserId: {UserId}", userId);
                 return $"Error during check-in: {ex.Message}";
             }
         }
@@ -46,18 +55,25 @@ namespace AttendenceSystem01.Services
         {
             try
             {
+                _logger.LogInformation("CheckOutAsync called for UserId: {UserId}", userId);
+
                 var istZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
                 var istNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, istZone);
-
                 var today = DateOnly.FromDateTime(istNow.Date);
-                var records = await _repository.GetByUserAndDateAsync(userId, today);
 
+                var records = await _repository.GetByUserAndDateAsync(userId, today);
                 if (!records.Any())
+                {
+                    _logger.LogWarning("User {UserId} has not checked in today", userId);
                     return "You have not checked in today.";
+                }
 
                 var lastRecord = records.LastOrDefault(a => a.CheckOutTime == null);
                 if (lastRecord == null)
+                {
+                    _logger.LogWarning("User {UserId} has already checked out today", userId);
                     return "You have already checked out today.";
+                }
 
                 lastRecord.CheckOutTime = istNow.TimeOfDay;
                 lastRecord.Status = "Present";
@@ -79,10 +95,12 @@ namespace AttendenceSystem01.Services
                     }
                 }
 
+                _logger.LogInformation("Check-out successful for UserId: {UserId}", userId);
                 return "Check-out successful";
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error during check-out for UserId: {UserId}", userId);
                 return $"Error during check-out: {ex.Message}";
             }
         }
@@ -91,6 +109,8 @@ namespace AttendenceSystem01.Services
         {
             try
             {
+                _logger.LogInformation("GetTodayAttendanceAsync called for UserId: {UserId}", userId);
+
                 var today = DateOnly.FromDateTime(DateTime.UtcNow);
                 var records = await _repository.GetByUserAndDateAsync(userId, today);
 
@@ -102,10 +122,7 @@ namespace AttendenceSystem01.Services
 
                 string workingHours = "00:00:00";
                 if (firstCheckIn != null && lastCheckOut != null)
-                {
-                    var duration = lastCheckOut.Value - firstCheckIn.Value;
-                    workingHours = duration.ToString(@"hh\:mm\:ss");
-                }
+                    workingHours = (lastCheckOut.Value - firstCheckIn.Value).ToString(@"hh\:mm\:ss");
 
                 return new
                 {
@@ -121,17 +138,19 @@ namespace AttendenceSystem01.Services
                     }).ToList()
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error fetching today's attendance for UserId: {UserId}", userId);
                 return new { workingHours = "00:00:00", attendances = new List<object>() };
             }
         }
 
-        // ✅ All Attendance (single user)
         public async Task<object> GetAllAttendanceAsync(int userId)
         {
             try
             {
+                _logger.LogInformation("GetAllAttendanceAsync called for UserId: {UserId}", userId);
+
                 var records = await _repository.GetByUserAsync(userId);
                 if (!records.Any())
                     return new { totalWorkingHours = "00:00:00", attendances = new List<object>() };
@@ -160,17 +179,19 @@ namespace AttendenceSystem01.Services
                     }).ToList()
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error fetching all attendance for UserId: {UserId}", userId);
                 return new { totalWorkingHours = "00:00:00", attendances = new List<object>() };
             }
         }
 
-        // ✅ All Users Attendance (Admin Only)
         public async Task<object> GetAllUsersAttendanceAsync()
         {
             try
             {
+                _logger.LogInformation("GetAllUsersAttendanceAsync called");
+
                 var records = await _repository.GetAllAsync();
                 if (!records.Any())
                     return new List<object>();
@@ -204,8 +225,9 @@ namespace AttendenceSystem01.Services
                         };
                     }).ToList();
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error fetching all users attendance");
                 return new List<object>();
             }
         }
