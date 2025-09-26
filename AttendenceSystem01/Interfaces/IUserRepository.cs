@@ -11,11 +11,10 @@ namespace AttendenceSystem01.Interfaces
         Task<List<User>> GetAllAsync();
         Task<List<Role>> GetAllrolesAsync();
         Task UpdateAsync(User user);
-
         Task UpdateUserRolesAsync(int userId, List<int> roleIds);
         Task DeleteAsync(User user);
         Task<User?> GetByIdAsync(int userId);
-
+        Task<User?> GetUserByIdAsync(int id);
 
     }
 }

@@ -198,6 +198,44 @@ namespace AttendenceSystem01.Services
                 return $"Error deleting user: {ex.Message}";
             }
         }
+        public async Task<object?> GetUserByIdAsync(int id)
+        {
+            var user = await _repository.GetUserByIdAsync(id);
+            if (user == null)
+                return null;
+
+            var roles = user.UserRoles
+                .Select(ur => new
+                {
+                    RoleId = ur.Role.RoleId,
+                    RoleName = ur.Role.RoleName
+                })
+                .ToList();
+
+            return new
+            {
+                user.UserId,
+                user.FullName,
+                user.Email,
+                user.IsActive,
+                Roles = roles,
+
+                Attendances = user.Attendances?.Select(a => new
+                {
+                    a.AttendanceDate,
+                    CheckInTime = a.CheckInTime.HasValue
+                   ? a.CheckInTime.Value.ToString(@"hh\:mm\:ss")
+                   : null,
+                    CheckOutTime = a.CheckOutTime.HasValue
+                   ? a.CheckOutTime.Value.ToString(@"hh\:mm\:ss")
+                   : null,
+                    a.Status,
+                    a.WorkingHours
+                })
+
+            };
+        }
+
 
 
 

@@ -107,6 +107,18 @@ namespace AttendenceSystem01.Controllers
             return Ok(new { message = result });
         }
 
+        [HttpGet("GetUserById/{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetUserById(int id)
+        {
+            var result = await _service.GetUserByIdAsync(id);
+
+            if (result == null)
+                return NotFound(new { message = "User not found" });
+
+            return Ok(result);
+        }
+
 
     }
 }

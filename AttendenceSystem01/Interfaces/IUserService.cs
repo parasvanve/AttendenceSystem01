@@ -10,5 +10,6 @@ namespace AttendenceSystem01.IServices
             Task<object> GetAllRolesAsync();
             Task<string> UpdateUserAsync(UserUpdateDto dto, bool isAdmin);
             Task<string> DeleteUserAsync(int userId);
+            Task<object?> GetUserByIdAsync(int id);
     } 
 }
