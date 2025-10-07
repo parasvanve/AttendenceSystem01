@@ -137,21 +137,28 @@ namespace AttendenceSystem01.Controllers
             return Ok(new { message = result });
         }
 
-        [HttpGet("GetUserById/{id}")]
-        [Authorize(Roles = "Admin,Super Admin")]
-        public async Task<IActionResult> GetUserById(int id)
+        [HttpGet("GetUserById/{id?}")]
+        [Authorize]
+        public async Task<IActionResult> GetUserById(int? id)
         {
-            _logger.LogInformation("GetUserById called for UserId {UserId}", id);
-            var result = await _service.GetUserByIdAsync(id);
+            var userIdFromToken = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+            var isAdmin = User.IsInRole("Admin") || User.IsInRole("Super Admin");
+
+            var targetUserId = isAdmin ? (id ?? userIdFromToken) : userIdFromToken;
+
+            _logger.LogInformation("GetUserById called for UserId {UserId} by {RequesterId}", targetUserId, userIdFromToken);
+
+            var result = await _service.GetUserByIdAsync(targetUserId);
 
             if (result == null)
             {
-                _logger.LogWarning("User not found with UserId {UserId}", id);
+                _logger.LogWarning("User not found with UserId {UserId}", targetUserId);
                 return NotFound(new { message = "User not found" });
             }
 
-            _logger.LogInformation("User retrieved successfully with UserId {UserId}", id);
+            _logger.LogInformation("User retrieved successfully with UserId {UserId}", targetUserId);
             return Ok(result);
         }
     }
+
 }
