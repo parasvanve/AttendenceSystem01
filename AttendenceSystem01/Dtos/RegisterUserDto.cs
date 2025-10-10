@@ -5,9 +5,14 @@ namespace AttendenceSystem01.Dtos
         public class RegisterUserDto
         {
             [Required]
+            [StringLength(50, ErrorMessage = "Username cannot be longer than 50 characters.")]
             public string FullName { get; set; }
-            [Required]
+            [Required(ErrorMessage = "Email is required.")]
+            [RegularExpression(@"^[A-Za-z][A-Za-z0-9._%+-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$",
+            ErrorMessage = "Invalid email address format (cannot start with number).")]
+            [EmailAddress(ErrorMessage = "Invalid email address format.")]
             public string Email { get; set; }
+
             [Required]
             public string Password { get; set; }
             [Required]
