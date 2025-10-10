@@ -40,7 +40,7 @@ namespace AttendenceSystem01.Services
 
             var token = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
-                audience: _config["Jwt:Issuer"],
+                audience: _config["Jwt:Audience"],
                 claims: claims,
                 expires: DateTime.UtcNow.AddHours(2),
                 signingCredentials: creds
@@ -68,7 +68,7 @@ namespace AttendenceSystem01.Services
                     ValidateIssuer = true,
                     ValidIssuer = _config["Jwt:Issuer"],
                     ValidateAudience = true,
-                    ValidAudience = _config["Jwt:Issuer"],
+                    ValidAudience = _config["Jwt:Audience"],
                     ClockSkew = TimeSpan.Zero
                 }, out SecurityToken validatedToken);
 
