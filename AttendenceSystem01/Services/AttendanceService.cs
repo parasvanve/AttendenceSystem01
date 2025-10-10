@@ -62,10 +62,18 @@ namespace AttendenceSystem01.Services
                 var today = DateOnly.FromDateTime(istNow.Date);
 
                 var records = await _repository.GetByUserAndDateAsync(userId, today);
+
                 if (!records.Any())
                 {
                     _logger.LogWarning("User {UserId} has not checked in today", userId);
-                    return "You have not checked in today.";
+                    var absentAttendance = new Attendance
+                    {
+                        UserId = userId,
+                        AttendanceDate = today,
+                        Status = "Absent"
+                    };
+                    await _repository.AddAsync(absentAttendance);
+                    return "You did not check in today. Marked as Absent.";
                 }
 
                 var lastRecord = records.LastOrDefault(a => a.CheckOutTime == null);
@@ -76,7 +84,6 @@ namespace AttendenceSystem01.Services
                 }
 
                 lastRecord.CheckOutTime = istNow.TimeOfDay;
-                lastRecord.Status = "Present";
                 await _repository.UpdateAsync(lastRecord);
 
                 var firstCheckIn = records.Min(a => a.CheckInTime);
@@ -87,16 +94,24 @@ namespace AttendenceSystem01.Services
                     var duration = lastCheckOutTime.Value - firstCheckIn.Value;
                     string workingHours = duration.ToString(@"hh\:mm\:ss");
 
+                    string status;
+                    if (duration.TotalHours < 4)
+                        status = "Absent";
+                    else if (duration.TotalHours >= 4 && duration.TotalHours < 8)
+                        status = "Half Day";
+                    else
+                        status = "Present";
+
                     foreach (var rec in records)
                     {
                         rec.WorkingHours = workingHours;
-                        rec.Status = "Present";
+                        rec.Status = status;
                         await _repository.UpdateAsync(rec);
                     }
                 }
 
                 _logger.LogInformation("Check-out successful for UserId: {UserId}", userId);
-                return "Check-out successful";
+                return $"Check-out successful. Status: {records.First().Status}, Working Hours: {records.First().WorkingHours}";
             }
             catch (Exception ex)
             {
