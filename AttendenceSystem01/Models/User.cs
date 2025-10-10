@@ -13,18 +13,22 @@ public partial class User
     public int UserId { get; set; }
 
     [StringLength(100)]
+    [Required]
     public string FullName { get; set; } = null!;
 
     [StringLength(100)]
+    [Required]
     public string Email { get; set; } = null!;
 
     [StringLength(255)]
+    [Required]
     public string PasswordHash { get; set; } = null!;
 
     public bool IsActive { get; set; }
 
     [Column(TypeName = "datetime")]
     public DateTime CreatedAt { get; set; }
+    [Required]
 
     public int? CreatedById { get; set; }
 
