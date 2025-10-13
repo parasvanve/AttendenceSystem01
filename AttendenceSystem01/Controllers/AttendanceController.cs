@@ -120,5 +120,20 @@ namespace AttendenceSystem01.Controllers
             var result = await _service.GetAllUsersAttendanceAsync();
             return Ok(result);
         }
+
+        [HttpGet("GetUserAttendanceByIdAdmin/{userId}")]
+        [Authorize(Roles = "Admin,Super Admin")]
+        public async Task<IActionResult> GetUserAttendanceByAdmin(int userId)
+        {
+            _logger.LogInformation("GetUserAttendanceByAdmin called for UserId: {UserId}", userId);
+
+            var result = await _service.GetUserAttendanceByAdminAsync(userId);
+
+            if (result == null || !result.Any())
+                return NotFound(new { message = "No attendance records found for this user." });
+
+            return Ok(result);
+        }
+
     }
 }

@@ -9,5 +9,6 @@ namespace AttendenceSystem01.Interfaces
         Task<object> GetTodayAttendanceAsync(int userId);
         Task<object> GetAllAttendanceAsync(int userId);
         Task<object> GetAllUsersAttendanceAsync();
+        Task<List<object>> GetUserAttendanceByAdminAsync(int userId);
     }
 }

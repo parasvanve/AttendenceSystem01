@@ -260,6 +260,54 @@ namespace AttendenceSystem01.Services
                 _logger.LogError(ex, "Error fetching all users attendance");
                 return new List<object>();
             }
+
         }
+
+        public async Task<List<object>> GetUserAttendanceByAdminAsync(int userId)
+        {
+            try
+            {
+                _logger.LogInformation("GetUserAttendanceByAdminAsync called for UserId: {UserId}", userId);
+
+                var records = await _repository.GetByUserAsync(userId);
+                if (!records.Any())
+                    return new List<object>();
+
+                var grouped = records
+                    .GroupBy(r => r.AttendanceDate)
+                    .Select(g =>
+                    {
+                        var firstCheckIn = g.Min(a => a.CheckInTime);
+                        var lastCheckOut = g.Max(a => a.CheckOutTime);
+
+                        string workingHours = "00:00:00";
+                        if (firstCheckIn != null && lastCheckOut != null)
+                        {
+                            var duration = lastCheckOut.Value - firstCheckIn.Value;
+                            workingHours = duration.ToString(@"hh\:mm\:ss");
+                        }
+
+                        return new
+                        {
+                            AttendanceDate = g.Key,
+                            FirstCheckIn = firstCheckIn?.ToString(@"hh\:mm\:ss"),
+                            LastCheckOut = lastCheckOut?.ToString(@"hh\:mm\:ss"),
+                            Status = g.LastOrDefault()?.Status ?? "N/A",
+                            WorkingHours = workingHours
+                        };
+                    })
+                    .OrderBy(g => g.AttendanceDate)
+                    .ToList<object>();
+
+                return grouped;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching user attendance for UserId: {UserId}", userId);
+                return new List<object>();
+            }
+        }
+
+
     }
 }
