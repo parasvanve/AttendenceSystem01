@@ -76,6 +76,20 @@ namespace AttendenceSystem01.Services
                     return "You did not check in today. Marked as Absent.";
                 }
 
+                if (istNow.Hour == 0)
+                {
+                    _logger.LogWarning("User {UserId} did not check out before midnight", userId);
+
+                    foreach (var rec in records.Where(r => r.CheckOutTime == null))
+                    {
+                        rec.Status = "Absent";
+                        rec.WorkingHours = "00:00:00";
+                        await _repository.UpdateAsync(rec);
+                    }
+
+                    return "You did not check out before midnight. Marked as Absent.";
+                }
+
                 var lastRecord = records.LastOrDefault(a => a.CheckOutTime == null);
                 if (lastRecord == null)
                 {
@@ -119,6 +133,7 @@ namespace AttendenceSystem01.Services
                 return $"Error during check-out: {ex.Message}";
             }
         }
+
 
         public async Task<object> GetTodayAttendanceAsync(int userId)
         {
