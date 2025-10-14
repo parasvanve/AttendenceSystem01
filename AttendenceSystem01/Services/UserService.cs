@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace AttendenceSystem01.Services
@@ -80,19 +81,26 @@ namespace AttendenceSystem01.Services
             {
                 _logger.LogInformation("LoginAsync called for email {Email}", dto.Email);
 
-                var user = await _repository.GetByEmailAsync(dto.Email);
-                if (user == null)
-                {
-                    _logger.LogWarning("Invalid login attempt for email {Email}", dto.Email);
+                if (string.IsNullOrWhiteSpace(dto.Email))
                     return ("Invalid credentials", null, 0, new List<object>());
+
+                string pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
+                bool isEmailFormatValid = Regex.IsMatch(dto.Email, pattern, RegexOptions.IgnoreCase);
+
+                if (!isEmailFormatValid)
+                {
+                    _logger.LogWarning("Invalid email format for {Email}", dto.Email);
+                    return ("Invalid email format", null, 0, new List<object>());
                 }
+
+                var user = await _repository.GetByEmailAsync(dto.Email);
+
+                if (user == null)
+                    return ("Invalid email", null, 0, new List<object>());
 
                 var decrypted = _encryption.Decrypt(user.PasswordHash);
                 if (decrypted != dto.Password)
-                {
-                    _logger.LogWarning("Invalid login attempt for email {Email}", dto.Email);
-                    return ("Invalid credentials", null, 0, new List<object>());
-                }
+                    return ("Invalid password", null, 0, new List<object>());
 
                 var roles = user.UserRoles
                     .Select(ur => new
@@ -105,7 +113,6 @@ namespace AttendenceSystem01.Services
                 var roleNames = roles.Select(r => r.RoleName).ToList();
                 var token = _jwtService.GenerateToken(user.UserId, user.Email, roleNames);
 
-                _logger.LogInformation("User logged in successfully with email {Email}", dto.Email);
                 return ("Login successful", token, user.UserId, roles.Cast<object>().ToList());
             }
             catch (Exception ex)

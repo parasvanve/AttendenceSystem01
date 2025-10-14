@@ -24,7 +24,9 @@ public partial class User
     [Required]
     public string PasswordHash { get; set; } = null!;
 
-    public bool IsActive { get; set; }
+    [Required]
+    public bool IsActive { get; set; } = true;
+
 
     [Column(TypeName = "datetime")]
     public DateTime CreatedAt { get; set; }

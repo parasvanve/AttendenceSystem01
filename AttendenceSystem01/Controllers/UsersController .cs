@@ -64,8 +64,11 @@ namespace AttendenceSystem01.Controllers
 
                 if (result.Token == null)
                 {
-                    _logger.LogWarning("Login failed for Email: {Email}", dto.Email);
-                    return Unauthorized(new { message = "Invalid credentials" });
+                    _logger.LogWarning("Login failed for Email: {Email}, Reason: {Reason}", dto.Email, result.Message);
+                    return Unauthorized(new
+                    {
+                        message = result.Message 
+                    });
                 }
 
                 _logger.LogInformation("Login successful for Email: {Email}", dto.Email);
