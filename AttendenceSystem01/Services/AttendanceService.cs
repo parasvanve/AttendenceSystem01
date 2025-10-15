@@ -230,27 +230,29 @@ namespace AttendenceSystem01.Services
                     .GroupBy(r => r.UserId)
                     .Select(g =>
                     {
-                        TimeSpan totalDuration = TimeSpan.Zero;
+                        // TimeSpan totalDuration = TimeSpan.Zero;
+                        TimeSpan WorkingHoursByDay = TimeSpan.Zero;
                         foreach (var day in g.GroupBy(r => r.AttendanceDate))
                         {
                             var firstCheckIn = day.Min(a => a.CheckInTime);
                             var lastCheckOut = day.Max(a => a.CheckOutTime);
 
                             if (firstCheckIn != null && lastCheckOut != null)
-                                totalDuration += lastCheckOut.Value - firstCheckIn.Value;
+                                WorkingHoursByDay = lastCheckOut.Value - firstCheckIn.Value;
                         }
 
                         return new
                         {
                             UserId = g.Key,
-                            TotalWorkingHours = totalDuration.ToString(@"hh\:mm\:ss"),
+                           // TotalWorkingHours = totalDuration.ToString(@"hh\:mm\:ss"),
                             Attendances = g.Select(a => new
                             {
                                 a.AttendanceId,
                                 a.AttendanceDate,
                                 CheckInTime = a.CheckInTime?.ToString(@"hh\:mm\:ss"),
                                 CheckOutTime = a.CheckOutTime?.ToString(@"hh\:mm\:ss"),
-                                a.Status
+                                a.Status,
+                                a.WorkingHours
                             }).ToList()
                         };
                     }).ToList();

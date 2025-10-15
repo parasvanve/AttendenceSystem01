@@ -77,7 +77,10 @@ namespace AttendenceSystem01.Controllers
                     message = result.Message,
                     token = result.Token,
                     userId = result.UserId,
+                    UserName = result.FullName,
                     roles = result.Roles
+                   
+                    
                 });
             }
             catch (Exception ex)

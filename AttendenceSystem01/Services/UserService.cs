@@ -75,14 +75,14 @@ namespace AttendenceSystem01.Services
             }
         }
 
-        public async Task<(string Message, string? Token, int UserId, List<object> Roles)> LoginAsync(LoginDto dto)
+        public async Task<(string Message, string? Token, int UserId,string FullName, List<object> Roles)> LoginAsync(LoginDto dto)
         {
             try
             {
                 _logger.LogInformation("LoginAsync called for email {Email}", dto.Email);
 
                 if (string.IsNullOrWhiteSpace(dto.Email))
-                    return ("Invalid credentials", null, 0, new List<object>());
+                    return ("Invalid credentials", null, 0,null, new List<object>());
 
                 string pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
                 bool isEmailFormatValid = Regex.IsMatch(dto.Email, pattern, RegexOptions.IgnoreCase);
@@ -90,17 +90,18 @@ namespace AttendenceSystem01.Services
                 if (!isEmailFormatValid)
                 {
                     _logger.LogWarning("Invalid email format for {Email}", dto.Email);
-                    return ("Invalid email format", null, 0, new List<object>());
+                    return ("Invalid email format", null, 0,null, new List<object>());
                 }
 
                 var user = await _repository.GetByEmailAsync(dto.Email);
 
                 if (user == null)
-                    return ("Invalid email", null, 0, new List<object>());
+                    return ("Invalid email", null, 0,null, new List<object>());
 
                 var decrypted = _encryption.Decrypt(user.PasswordHash);
                 if (decrypted != dto.Password)
-                    return ("Invalid password", null, 0, new List<object>());
+                    return ("Invalid password", null, 0,null, new List<object>());
+             
 
                 var roles = user.UserRoles
                     .Select(ur => new
@@ -111,14 +112,14 @@ namespace AttendenceSystem01.Services
                     .ToList();
 
                 var roleNames = roles.Select(r => r.RoleName).ToList();
-                var token = _jwtService.GenerateToken(user.UserId, user.Email, roleNames);
+                var token = _jwtService.GenerateToken(user.UserId,user.FullName, user.Email, roleNames);
 
-                return ("Login successful", token, user.UserId, roles.Cast<object>().ToList());
+                return ("Login successful", token, user.UserId,user.FullName, roles.Cast<object>().ToList());
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during login for email {Email}", dto.Email);
-                return ($"Error during login: {ex.Message}", null, 0, new List<object>());
+                return ($"Error during login: {ex.Message}", null, 0, null,new List<object>());
             }
         }
 

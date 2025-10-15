@@ -19,7 +19,7 @@ namespace AttendenceSystem01.Services
             _config = config;
         }
 
-        public string GenerateToken(int userId, string email, List<string> roles)
+        public string GenerateToken(int userId,string Fullname, string email, List<string> roles)
         {
             var claims = new List<Claim>
     {
