@@ -23,6 +23,7 @@ namespace AttendenceSystem01.Controllers
         }
 
         [HttpPost("register")]
+        [Authorize(Roles ="Admin,SuperAdmin")]
         public async Task<IActionResult> Register([FromBody] RegisterUserDto dto)
         {
             try

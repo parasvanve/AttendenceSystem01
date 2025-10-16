@@ -263,6 +263,41 @@ namespace AttendenceSystem01.Services
                     })
                     .ToList();
 
+                // ✅ Har din ke attendance group kar rahe hain
+                var dailyAttendance = user.Attendances?
+                    .GroupBy(a => a.AttendanceDate)
+                    .Select(g =>
+                    {
+                        var firstCheckIn = g
+                            .Where(x => x.CheckInTime.HasValue)
+                            .OrderBy(x => x.CheckInTime)
+                            .FirstOrDefault()?.CheckInTime;
+
+                        var lastCheckOut = g
+                            .Where(x => x.CheckOutTime.HasValue)
+                            .OrderByDescending(x => x.CheckOutTime)
+                            .FirstOrDefault()?.CheckOutTime;
+
+                        // ✅ Working hours calculate
+                        TimeSpan? totalHours = null;
+                        if (firstCheckIn.HasValue && lastCheckOut.HasValue)
+                            totalHours = lastCheckOut.Value - firstCheckIn.Value;
+
+                        // ✅ Status (pehle record ka ya latest ka)
+                        var status = g.FirstOrDefault()?.Status;
+
+                        return new
+                        {
+                            AttendanceDate = g.Key,
+                            Status = status,
+                            FirstCheckIn = firstCheckIn?.ToString(@"hh\:mm\:ss"),
+                            LastCheckOut = lastCheckOut?.ToString(@"hh\:mm\:ss"),
+                            TotalWorkingHours = totalHours?.ToString(@"hh\:mm\:ss")
+                        };
+                    })
+                    .OrderByDescending(a => a.AttendanceDate)
+                    .ToList();
+
                 _logger.LogInformation("User with Id {UserId} retrieved successfully with {RoleCount} roles", id, roles.Count);
 
                 return new
@@ -272,14 +307,7 @@ namespace AttendenceSystem01.Services
                     user.Email,
                     user.IsActive,
                     Roles = roles,
-                    Attendances = user.Attendances?.Select(a => new
-                    {
-                        a.AttendanceDate,
-                        CheckInTime = a.CheckInTime?.ToString(@"hh\:mm\:ss"),
-                        CheckOutTime = a.CheckOutTime?.ToString(@"hh\:mm\:ss"),
-                        a.Status,
-                        a.WorkingHours
-                    })
+                    Attendances = dailyAttendance
                 };
             }
             catch (Exception ex)
@@ -288,5 +316,6 @@ namespace AttendenceSystem01.Services
                 throw;
             }
         }
+
     }
 }
