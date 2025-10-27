@@ -226,44 +226,44 @@ namespace AttendenceSystem01.Services
                 if (!records.Any())
                     return new List<object>();
 
-                return records
-                    .GroupBy(r => r.UserId)
+                var result = records
+                    .GroupBy(r => new { r.UserId, r.AttendanceDate })
                     .Select(g =>
                     {
-                        // TimeSpan totalDuration = TimeSpan.Zero;
-                        TimeSpan WorkingHoursByDay = TimeSpan.Zero;
-                        foreach (var day in g.GroupBy(r => r.AttendanceDate))
-                        {
-                            var firstCheckIn = day.Min(a => a.CheckInTime);
-                            var lastCheckOut = day.Max(a => a.CheckOutTime);
+                        var firstCheckIn = g.Min(a => a.CheckInTime);
+                        var lastCheckOut = g.Max(a => a.CheckOutTime);
 
-                            if (firstCheckIn != null && lastCheckOut != null)
-                                WorkingHoursByDay = lastCheckOut.Value - firstCheckIn.Value;
-                        }
+                        TimeSpan? workingHours = null;
+                        if (firstCheckIn.HasValue && lastCheckOut.HasValue)
+                            workingHours = lastCheckOut.Value - firstCheckIn.Value;
 
                         return new
                         {
-                            UserId = g.Key,
-                           // TotalWorkingHours = totalDuration.ToString(@"hh\:mm\:ss"),
-                            Attendances = g.Select(a => new
-                            {
-                                a.AttendanceId,
-                                a.AttendanceDate,
-                                CheckInTime = a.CheckInTime?.ToString(@"hh\:mm\:ss"),
-                                CheckOutTime = a.CheckOutTime?.ToString(@"hh\:mm\:ss"),
-                                a.Status,
-                                a.WorkingHours
-                            }).ToList()
+                            g.Key.UserId,
+                            g.Key.AttendanceDate,
+                            FirstCheckIn = firstCheckIn?.ToString(@"hh\:mm\:ss"),
+                            LastCheckOut = lastCheckOut?.ToString(@"hh\:mm\:ss"),
+                            WorkingHours = workingHours?.ToString(@"hh\:mm\:ss"),
+                            Status = g.OrderByDescending(a => a.AttendanceId).FirstOrDefault()?.Status
                         };
-                    }).ToList();
+                    })
+                    .GroupBy(x => x.UserId)
+                    .Select(userGroup => new
+                    {
+                        UserId = userGroup.Key,
+                        Attendances = userGroup.OrderBy(a => a.AttendanceDate).ToList()
+                    })
+                    .ToList();
+
+                return result;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching all users attendance");
                 return new List<object>();
             }
-
         }
+
 
         public async Task<List<object>> GetUserAttendanceByAdminAsync(int userId)
         {
